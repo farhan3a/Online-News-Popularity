@@ -1,0 +1,28 @@
+---
+title: "online-news-popularity"
+author: "Sneh Gurdasani, Akshit Jain, Farhan Ansari, Sagar Singh"
+date: "11/11/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
+
+## Load and Tidy Dataset
+```{r f1, echo = FALSE}
+get_tidy_data <- function(df) {
+  head(df)
+}
+```
+
+```{r}
+df <- read_csv("OnlineNewsPopularity/OnlineNewsPopularity.csv", col_types = cols())
+get_tidy_data(df)
+```
+
+```{r f1, eval = FALSE}
+```
+

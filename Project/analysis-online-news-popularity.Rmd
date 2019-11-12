@@ -14,7 +14,10 @@ library(ggplot2)
 ## Load and Tidy Dataset
 ```{r f1, echo = FALSE}
 get_tidy_data <- function(df) {
-  head(df)
+  # extracting date and title from url string
+  clustering_df <- df %>% 
+    mutate(date = as.Date(sub(".*?\\b(\\d{4}/\\d{1,2}/\\d{1,2})\\b.*", "\\1", url)),
+           article_title = word(url, -2, sep = '/'))
 }
 ```
 

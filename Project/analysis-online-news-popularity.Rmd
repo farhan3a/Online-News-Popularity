@@ -18,12 +18,20 @@ get_tidy_data <- function(df) {
   clustering_df <- df %>% 
     mutate(date = as.Date(sub(".*?\\b(\\d{4}/\\d{1,2}/\\d{1,2})\\b.*", "\\1", url)),
            article_title = word(url, -2, sep = '/'))
+  other_df <- df %>% gather(key='category', value='is_category',
+                            data_channel_is_lifestyle, data_channel_is_entertainment,
+                            data_channel_is_bus, data_channel_is_socmed, data_channel_is_tech,
+                            data_channel_is_world) %>%
+    filter(is_category == 1) %>%
+    select(-is_category)
+  other_df
 }
 ```
 
 ```{r}
 df <- read_csv("OnlineNewsPopularity/OnlineNewsPopularity.csv", col_types = cols())
-get_tidy_data(df)
+df1 <- get_tidy_data(df)
+df1
 ```
 
 ```{r f1, eval = FALSE}

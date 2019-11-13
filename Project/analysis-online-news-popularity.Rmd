@@ -18,20 +18,40 @@ get_tidy_data <- function(df) {
   clustering_df <- df %>% 
     mutate(date = as.Date(sub(".*?\\b(\\d{4}/\\d{1,2}/\\d{1,2})\\b.*", "\\1", url)),
            article_title = word(url, -2, sep = '/'))
+  # gather article categories and weekdays
   other_df <- df %>% gather(key='category', value='is_category',
                             data_channel_is_lifestyle, data_channel_is_entertainment,
                             data_channel_is_bus, data_channel_is_socmed, data_channel_is_tech,
                             data_channel_is_world) %>%
     filter(is_category == 1) %>%
-    select(-is_category)
+    select(-is_category) %>%
+    mutate(category = case_when(category == 'data_channel_is_lifestyle' ~ 'Lifestyle',
+                                category == 'data_channel_is_entertainment' ~ 'Entertainment',
+                                category == 'data_channel_is_bus' ~ 'Business',
+                                category == 'data_channel_is_socmed' ~ 'Social Media',
+                                category == 'data_channel_is_tech' ~ 'Technology',
+                                category == 'data_channel_is_world' ~ 'World')) %>%
+    gather(key='day', value='what_day',
+           weekday_is_monday, weekday_is_tuesday,
+                            weekday_is_wednesday, weekday_is_thursday, weekday_is_friday,
+                            weekday_is_saturday, weekday_is_sunday) %>%
+    filter(what_day == 1) %>%
+    select(-what_day) %>%
+    mutate(day = case_when(day == 'weekday_is_monday' ~ 'Monday',
+                                day == 'weekday_is_tuesday' ~ 'Tuesday',
+                                day == 'weekday_is_wednesday' ~ 'Wednesday',
+                                day == 'weekday_is_thursday' ~ 'Thursday',
+                                day == 'weekday_is_friday' ~ 'Friday',
+                                day == 'weekday_is_saturday' ~ 'Saturday',
+                                day == 'weekday_is_sunday' ~ 'Sunday'))
   other_df
 }
 ```
 
 ```{r}
 df <- read_csv("OnlineNewsPopularity/OnlineNewsPopularity.csv", col_types = cols())
-df1 <- get_tidy_data(df)
-df1
+other_df <- get_tidy_data(df)
+other_df %>% select(url, category, day)
 ```
 
 ```{r f1, eval = FALSE}

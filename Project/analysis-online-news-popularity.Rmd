@@ -18,8 +18,9 @@ get_tidy_data <- function(df) {
   clustering_df <- df %>% 
     mutate(date = as.Date(sub(".*?\\b(\\d{4}/\\d{1,2}/\\d{1,2})\\b.*", "\\1", url)),
            article_title = word(url, -2, sep = '/'))
+  
   # gather article categories and weekdays
-  other_df <- df %>% gather(key='category', value='is_category',
+  other_df <- clustering_df %>% gather(key='category', value='is_category',
                             data_channel_is_lifestyle, data_channel_is_entertainment,
                             data_channel_is_bus, data_channel_is_socmed, data_channel_is_tech,
                             data_channel_is_world) %>%
@@ -54,6 +55,119 @@ other_df <- get_tidy_data(df)
 other_df %>% select(url, category, day)
 ```
 
-```{r f1, eval = FALSE}
+```{r f2, eval = FALSE}
+visualize_summary_plots <- function(df){
+#Plot 1: Count of each day of news
+plt_day_count <- ggplot(df, aes(x = day)) + 
+    geom_bar()
+print(plt_day_count)
+
+#Plot 2: Number of shares of each day of the weeek
+plt_day_share <- ggplot(df, aes(x = day, y = shares)) + 
+  geom_bar(stat = "identity")  
+print(plt_day_share)
+
+#Plot 3: Average shares of news by day
+plt_avg_shares_by_day <- df %>%
+  group_by(day) %>%
+  summarise(count = n(), tot_share = sum(shares), avg_share = tot_share/count) %>%
+  ggplot(aes(x = day, y = avg_share)) + 
+  geom_bar(stat = "identity")
+print(plt_avg_shares_by_day)
+
+#Plot 4: Average shares of news by category each day
+plt_avg_daily_shares_by_category <- df %>%
+  group_by(category, day) %>%
+  summarise(count = n(), tot_share = sum(shares), avg_share = tot_share/count) %>%
+  ggplot(aes(x = day, y = avg_share, fill = day)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  facet_wrap(~category)
+print(plt_avg_daily_shares_by_category)
+
+#Plot 5: Count of shares w.r.t images
+plt_img_shares <- ggplot(df, aes(x = num_imgs, y = shares)) + 
+  geom_point()
+print(plt_img_shares)
+
+#Plot 6: Count of shares w.r.t images for each category
+plt_category_img_shares <- ggplot(df, aes(x = num_imgs, y = shares, color = category)) + 
+  geom_point(alpha=1/10) +
+  geom_smooth() +
+  coord_cartesian(ylim = c(0,35000))
+print(plt_category_img_shares)
+
+#Plot 7: Count for shares w.r.t videos
+plt_videos_shares <- ggplot(df, aes(x = num_videos, y = shares)) + 
+  geom_point()
+print(plt_videos_shares)
+
+#Plot 8: Count of shares w.r.t videos for each category
+plt_category_videos_shares <- ggplot(df, aes(x = num_videos, y = shares, color = category)) + 
+  geom_point(alpha=1/10, na.rm = TRUE) + 
+  geom_smooth() +
+  coord_cartesian(ylim = c(-80000,130000))
+print(plt_category_videos_shares)
+
+#Plot 9: Global Sentiment Polarity w.r.t shares for each category 
+plt_gsp_shares_category <- ggplot(other_df, aes(x = global_sentiment_polarity, y = shares, color = category)) + 
+  geom_point(alpha=1/2, na.rm = TRUE) +
+  facet_wrap(~category)
+print(plt_gsp_shares_category)
+
+#Plot 10: Rate Positive Polarity w.r.t shares for each category 
+plt_rpp_shares_category <- ggplot(other_df, aes(x = rate_positive_words, y = shares, color = category)) + 
+  geom_point(alpha=1/2, na.rm = TRUE) +
+  facet_wrap(~category)
+print(plt_rpp_shares_category)
+
+#Plot 11: minimum negative polarity w.r.t shares for each category 
+plt_mnp_shares_category <- ggplot(other_df, aes(x = min_negative_polarity, y = shares, color = category)) + 
+  geom_point(alpha=1/2, na.rm = TRUE) +
+  facet_wrap(~category)
+print(plt_mnp_shares_category)
+
+#Plot 12: Global Rate Negative words w.r.t shares for each category 
+plt_grnw_shares_category <- ggplot(other_df, aes(x = global_rate_negative_words, y = shares, color = category)) + 
+  geom_point(alpha=1/2, na.rm = TRUE)
+print(plt_grnw_shares_category)
+
+#Plot 12: number of token content w.r.t shares 
+plt_n_tokens_content_shares <- ggplot(df, aes(x = n_tokens_content, y = shares)) + 
+  geom_histogram(alpha=1/2, na.rm = TRUE, stat = "identity") +
+  coord_cartesian(ylim = c(0,300000))
+print(plt_n_tokens_content_shares)
+
+plt_global_sub_shares <- ggplot(other_df, aes(x = global_subjectivity, y = shares)) + 
+  geom_point(na.rm = TRUE)
+print(plt_global_sub_shares)
+
+plt_avg_token_length_shares <- ggplot(other_df, aes(x = average_token_length, y = shares)) + 
+  geom_point(na.rm = TRUE)
+print(plt_avg_token_length_shares)
+
+plt_num_key_shares_category <- ggplot(other_df, aes(x = as.factor(num_keywords), y = shares, fill = category)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~category)
+print(plt_num_key_shares_category)
+
+} 
 ```
+
+
+```{r}
+visualize_summary_plots(other_df)
+
+head(other_df$title_subjectivity)
+
+ggplot(other_df, aes(x = title_subjectivity, y = shares, fill = category)) + 
+  geom_point() +
+  facet_wrap(~category)
+
+
+```
+
+
 

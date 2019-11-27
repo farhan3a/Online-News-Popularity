@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(ggcorrplot)
+library(dbscan)
 ```
 
 ## Load and Tidy Dataset
@@ -185,6 +186,7 @@ visualize_summary_plots(classification_df)
 
 ```{r f3, echo = FALSE}
 correlation_matrix <- function(df) {
+  df <- df %>% filter(category == typeOfArticle)
   corr_df <- as.data.frame(cor(df, method = c("pearson", "kendall", "spearman")))
   rownames(corr_df) <- colnames(corr_df)
   corr_df <- rownames_to_column(corr_df, var='correlation_with')
@@ -197,7 +199,85 @@ correlation_matrix <- function(df) {
 correlation_matrix(cluster_numeric_df) 
 ```
 
-```{r f4, echo = FALSE}
+
+```{r f4, echo=FALSE}
+#Principle Component Analysis for dimensionality reduction
+
+featureSelection <- function(df,maxComponents){
+  
+  prcompResult <- prcomp(cluster_numeric_df,rank.= maxComponents, scale.=TRUE)
+  pca_statistics <- summary(prcompResult)
+  max_variance = pca_statistics[[6]][[maxComponents*3]]
+  PCA_results <- as_tibble(prcompResult[[2]])
+  features = rownames(prcompResult[[2]])
+  PCA_results <- cbind(features,PCA_results)
+  fviz_eig(prcompResult)
+  print(paste0("Maximum Variance explained : ",max_variance*100," %"))
+  return(PCA_results)
+               
+} 
+```
+
+```{r}
+pca_analysis <- featureSelection(cluster_numeric_df,25)
+pca_analysis 
+
+top_features = c()
+
+```
+
+```{r f5, echo=FALSE}
+
+#Clustering Algorithms
+
+set.seed(20)
+
+elbowPlot <- function(df,max_iter){
+  wss <- data.frame(i = integer(), error = numeric())
+  for (i in 2:max_iter){
+    km1 <- kmeans(df, centers = i)
+    wss <- rbind(wss, data.frame(i,error=sum(km1$withinss)))
+  }
+  g <- ggplot(data=wss, aes(x=i, y = error))+
+    geom_line() + 
+    geom_smooth() +
+    scale_x_continuous(breaks = c(1:max_iter))
+  print(g)
+  return(wss)
+}
+
+apply_KMEANS = function(df,k){
+  
+  dfCluster <- kmeans(df, k, nstart = 20)
+  print(fviz_cluster(dfCluster, df,  geom = "point"))
+  
+  return(dfCluster) 
+}
+
+
+apply_DBScan = function(df,e,p){
+  
+  res.db <- dbscan::dbscan(scale(df),  eps= e, minPts =p)
+  fviz_cluster(res.db, scale(df),  geom = "point")
+  return(res.db)
+}
+
+
+```
+
+```{r f6, echo=FALSE}
+#Clustering Analysis: Exploration Phase
+
+
+
+#kNNdistplot(scale(test), k=5)
+
+
+
+```
+
+
+```{r f7, echo = FALSE}
 prepare_data_classification <- function(df) {
   print(summary(df$shares))
   # trying to categorize articles based on the mean shares -> NOT A GOOD IDEA!

@@ -295,7 +295,7 @@ apply_KMEANS = function(df,k){
 apply_DBScan = function(df,e,p){
   
   res.db <- dbscan::dbscan(scale(df),  eps= e, minPts =p)
-  fviz_cluster(res.db, scale(df),  geom = "point")
+  print(fviz_cluster(res.db, scale(df),  geom = "point"))
   return(res.db)
 }
 
@@ -344,8 +344,6 @@ clusterPlots = function(df,clusterValues){
     geom_point() +facet_wrap(~as.factor(cluster)) +
           labs(title = "num_keywords vs Shares By Clusters"))
    
-  
-  
 }
 
 ```
@@ -359,23 +357,21 @@ kmeans_allFeatures<- apply_KMEANS(cluster_numeric_df,7)
 elbowPlot(top_features,15)
 kmeans_selectedFeatures <- apply_KMEANS(top_features,6)
 
-kNNdistplot(top_features, k=5)
+kNNdistplot(top_features, k=5) #For appropriate eps value
 dbscan_cluster <- apply_DBScan(top_features,7,5)
+
+#Adding clusters into the dataset
 
 explorationData <- cluster_numeric_df
 explorationData$cluster1 <- kmeans_allFeatures$cluster
 explorationData$cluster2 <- kmeans_selectedFeatures$cluster
 explorationData$cluster3 <- dbscan_cluster$cluster
 
-
 #Plots
-
 
 clusterPlots(explorationData, explorationData$cluster1)
 clusterPlots(explorationData, explorationData$cluster2)
 clusterPlots(explorationData, explorationData$cluster3)
-
-
 
 
 ```

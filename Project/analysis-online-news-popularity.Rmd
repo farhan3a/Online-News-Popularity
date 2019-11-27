@@ -186,17 +186,24 @@ visualize_summary_plots(classification_df)
 
 ```{r f3, echo = FALSE}
 correlation_matrix <- function(df) {
-  df <- df %>% filter(category == typeOfArticle)
   corr_df <- as.data.frame(cor(df, method = c("pearson", "kendall", "spearman")))
   rownames(corr_df) <- colnames(corr_df)
   corr_df <- rownames_to_column(corr_df, var='correlation_with')
-  # get top 15 variables that have correlation with 'shares'
-  corr_df %>% select(correlation_with, shares) %>% top_n(15) %>% arrange(desc(shares))
+  return(corr_df)
 }
 ```
 
 ```{r}
-correlation_matrix(cluster_numeric_df) 
+corr_df <- correlation_matrix(cluster_numeric_df) 
+
+ # get top 15 variables that have correlation with 'shares'
+corr_df %>% select(correlation_with, shares) %>% arrange(desc(abs(shares))) %>% top_n(15)
+
+
+# Since the top 15 have high inter-correlation amongst them, we can further lower the features
+
+# kw_avg_avg, self_reference_avg_shares, kw_avg_min, num_hrefs, global_subjectivity, LDA_03, kw_min_avg, n_tokens_content,num_imgs,num_keywords
+
 ```
 
 
@@ -219,11 +226,41 @@ featureSelection <- function(df,maxComponents){
 ```
 
 ```{r}
-pca_analysis <- featureSelection(cluster_numeric_df,25)
+pca_analysis <- featureSelection(cluster_numeric_df ,25)
 pca_analysis 
 
-top_features = c()
+#Combining Results from PCA and Correlation Matrix
 
+top_features = cluster_numeric_df %>% select(global_sentiment_polarity, 
+                                             min_negative_polarity,avg_negative_polarity,
+                                             kw_avg_avg,
+                                             n_non_stop_words,
+                                             kw_avg_min,
+                                             data_channel_is_entertainment,title_subjectivity,
+                                             kw_min_min,
+                                             self_reference_avg_sharess,
+                                             abs_title_sentiment_polarity, title_subjectivity,
+                                             min_positive_polarity, 
+                                             LDA_04, LDA_02, data_channel_is_world,
+                                             kw_min_max, kw_min_avg,
+                                             max_negative_polarity, 
+                                             data_channel_is_lifestyle, 
+                                             weekday_is_wednesday, 
+                                             weekday_is_tuesday, weekday_is_thursday,
+                                             weekday_is_monday, 
+                                             min_positive_polarity, 
+                                             weekday_is_friday, 
+                                             num_videos, 
+                                             data_channel_is_socmed, weekday_is_sunday,
+                                             shares, n_tokens_title,
+                                             num_hrefs, global_subjectivity, LDA_03, 
+                                             n_tokens_content, num_imgs,num_keywords
+                                             )
+
+top_features$shares <- scale(top_features$shares)
+top_features$num_imgs <- scale(top_features$num_imgs)
+top_features$num_videos <- scale(top_features$num_videos)
+top_features$num_hrefs <- scale(top_features$num_hrefs)
 ```
 
 ```{r f5, echo=FALSE}
@@ -266,18 +303,85 @@ apply_DBScan = function(df,e,p){
 ```
 
 ```{r f6, echo=FALSE}
+
+clusterPlots = function(df,clusterValues){
+  
+  df$cluster <- clusterValues
+  
+  print(ggplot(df, aes(num_imgs,shares, color=as.factor(cluster))) + 
+          geom_point() + facet_wrap(~cluster) +
+          labs(title = "num_imgs vs Shares By Clusters")) 
+  
+  print(ggplot(df, aes(num_videos,shares, color=as.factor(cluster))) + 
+          geom_point() + facet_wrap(~cluster) +
+          labs(title = "num_videos vs Shares By Clusters"))
+
+  print(ggplot(df, aes(num_hrefs,shares, color=as.factor(cluster))) + 
+          geom_point() + facet_wrap(~cluster) +
+          labs(title = "num_hrefs vs Shares By Clusters"))
+
+  print(ggplot(df, aes(abs_title_sentiment_polarity,shares, color=as.factor(cluster))) + 
+    geom_point() + facet_wrap(~as.factor(cluster)) +
+          labs(title = "abs_title_sentiment_polarity vs Shares By Clusters"))
+  
+  print(ggplot(df, aes(title_subjectivity,shares, color=as.factor(cluster))) + 
+    geom_point() +facet_wrap(~as.factor(cluster)) +
+          labs(title = "title_subjectivity vs Shares By Clusters"))
+  
+  print(ggplot(df, aes(global_sentiment_polarity,shares, color=as.factor(cluster))) + 
+    geom_point() +facet_wrap(~as.factor(cluster)) +
+          labs(title = "global_sentiment_polarity vs Shares By Clusters"))
+  
+  print(ggplot(df, aes(max_negative_polarity,shares, color=as.factor(cluster))) + 
+    geom_point() +facet_wrap(~as.factor(cluster)) +
+          labs(title = "max_negative_polarity vs Shares By Clusters")) 
+  
+  print(ggplot(df, aes(n_tokens_content,shares, color=as.factor(cluster))) + 
+    geom_point() +facet_wrap(~as.factor(cluster)) +
+          labs(title = "n_tokens_content vs Shares By Clusters"))
+  
+   print(ggplot(df, aes(num_keywords,shares, color=as.factor(cluster))) + 
+    geom_point() +facet_wrap(~as.factor(cluster)) +
+          labs(title = "num_keywords vs Shares By Clusters"))
+   
+  
+  
+}
+
+```
+
+```{r f7, echo=FALSE}
 #Clustering Analysis: Exploration Phase
 
+elbowPlot(cluster_numeric_df,15)
+kmeans_allFeatures<- apply_KMEANS(cluster_numeric_df,7)
+
+elbowPlot(top_features,15)
+kmeans_selectedFeatures <- apply_KMEANS(top_features,6)
+
+kNNdistplot(top_features, k=5)
+dbscan_cluster <- apply_DBScan(top_features,7,5)
+
+explorationData <- cluster_numeric_df
+explorationData$cluster1 <- kmeans_allFeatures$cluster
+explorationData$cluster2 <- kmeans_selectedFeatures$cluster
+explorationData$cluster3 <- dbscan_cluster$cluster
 
 
-#kNNdistplot(scale(test), k=5)
+#Plots
+
+
+clusterPlots(explorationData, explorationData$cluster1)
+clusterPlots(explorationData, explorationData$cluster2)
+clusterPlots(explorationData, explorationData$cluster3)
+
 
 
 
 ```
 
 
-```{r f7, echo = FALSE}
+```{r f8, echo = FALSE}
 prepare_data_classification <- function(df) {
   print(summary(df$shares))
   # trying to categorize articles based on the mean shares -> NOT A GOOD IDEA!

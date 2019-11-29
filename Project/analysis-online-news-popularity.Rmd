@@ -57,35 +57,74 @@ get_tidy_data <- function(df) {
 }
 ```
 
+## Prepare Data for Classification
+```{r f2, echo = FALSE}
+prepare_data_classification <- function(df) {
+  
+  lifestyle_cutoff <- median(filter(df, category == 'Lifestyle')$shares)
+  entertainment_cutoff <- median(filter(df, category == 'Entertainment')$shares)
+  business_cutoff <- median(filter(df, category == 'Business')$shares)
+  socmed_cutoff <- median(filter(df, category == 'Social Media')$shares)
+  tech_cutoff <- median(filter(df, category == 'Technology')$shares)
+  world_cutoff <- median(filter(df, category == 'World')$shares)
+  
+  df <- df %>%
+    mutate( popularity = case_when(
+      category == 'Lifestyle' & shares >= lifestyle_cutoff ~ 'lifestyle_popular',
+      category == 'Lifestyle' & shares < lifestyle_cutoff ~ 'lifestyle_unpopular',
+      category == 'Entertainment' & shares >= entertainment_cutoff ~ 'entertainment_popular',
+      category == 'Entertainment' & shares < entertainment_cutoff ~ 'entertainment_unpopular',
+      category == 'Business' & shares >= business_cutoff ~ 'business_popular',
+      category == 'Business' & shares < business_cutoff ~ 'business_unpopular',
+      category == 'Social Media' & shares >= socmed_cutoff ~ 'socialmedia_popular',
+      category == 'Social Media' & shares < socmed_cutoff ~ 'socialmedia_unpopular',
+      category == 'Technology' & shares >= tech_cutoff ~ 'technology_popular',
+      category == 'Technology' & shares < tech_cutoff ~ 'technology_unpopular',
+      category == 'World' & shares >= world_cutoff ~ 'world_popular',
+      category == 'World' & shares < world_cutoff ~ 'world_unpopular')
+    )
+  
+  df <- df %>%
+    separate(popularity, c('cat', 'is_popular'), sep = '_', remove = FALSE)
+  
+  df <- df %>%
+    select(-cat)
+  
+  return (df)
+}
+```
+
 ```{r}
 df <- read_csv('OnlineNewsPopularity/OnlineNewsPopularity.csv', col_types = cols())
 list_of_dfs <- get_tidy_data(df)
 cluster_numeric_df <- list_of_dfs[[1]]
 classification_df <- list_of_dfs[[2]]
+classification_df <- prepare_data_classification(classification_df)
 ```
 
-```{r f2, echo = FALSE}
+## Visualize plots - EDA
+```{r f3, echo = FALSE}
 visualize_summary_plots <- function(df) {
   
-  plt_popular_count <- ggplot(classification_df, aes(x = is_popular)) +
-    geom_bar()+
+   #Plot 1: Label distribution
+  plt_popular_count <- ggplot(df, aes(x = is_popular)) +
+    geom_bar() +
     labs(x = "Popularity",
          y = "Frequency",
          title = "Popularity of articles")
   print(plt_popular_count)
     
-  #Plot 1: Count of each day of news
-  
+  #Plot 2: Count of each day of news
   plt_day_count <- ggplot(df, aes(x = day)) + 
     geom_bar()
   print(plt_day_count)
 
-  #Plot 2: Number of shares of each day of the weeek
+  #Plot 3: Number of shares of each day of the weeek
   plt_day_share <- ggplot(df, aes(x = day, y = shares)) + 
     geom_bar(stat = "identity")  
   print(plt_day_share)
 
-  #Plot 3: Average shares of news by day
+  #Plot 4: Average shares of news by day
   plt_avg_shares_by_day <- df %>%
     group_by(day) %>%
     summarise(count = n(), tot_share = sum(shares), avg_share = tot_share/count) %>%
@@ -93,7 +132,7 @@ visualize_summary_plots <- function(df) {
     geom_bar(stat = "identity")
   print(plt_avg_shares_by_day)
 
-  #Plot 4: Average shares of news by category each day
+  #Plot 5: Average shares of news by category each day
   plt_avg_daily_shares_by_category <- df %>%
    group_by(category, day) %>%
     summarise(count = n(), tot_share = sum(shares), avg_share = tot_share/count) %>%
@@ -105,106 +144,109 @@ visualize_summary_plots <- function(df) {
     facet_wrap(~category)
   print(plt_avg_daily_shares_by_category)
   
-  #Plot 5: Count of shares w.r.t images 
-  plt_img_shares <- ggplot(classification_df, aes(x = num_imgs, y = shares, color = is_popular)) +
-    #facet_wrap(~category) +
+  #Plot 6: Count of shares w.r.t images 
+  plt_img_shares <- ggplot(df, aes(x = num_imgs, y = shares, color = is_popular)) +
     geom_point(alpha = 1/10) +
     coord_cartesian(ylim = c(0,35000)) 
   print(plt_img_shares)
 
-  #Plot 6: Count of shares w.r.t images for each category
+  #Plot 7: Count of shares w.r.t images for each category
   plt_category_img_shares <- ggplot(df, aes(x = num_imgs, y = shares, color = category)) + 
     geom_point(alpha=1/10) +
     geom_smooth() +
     coord_cartesian(ylim = c(0,35000))
   print(plt_category_img_shares)
 
-  #Plot 7: Count for shares w.r.t videos
-  plt_videos_shares <- ggplot(classification_df, aes(x = num_videos, y = shares, color = is_popular)) + 
+  #Plot 8: Count for shares w.r.t videos
+  plt_videos_shares <- ggplot(df, aes(x = num_videos, y = shares, color = is_popular)) + 
     geom_point()+
     coord_cartesian(ylim = c(0,35000))
   print(plt_videos_shares)
 
-  #Plot 8: Count of shares w.r.t videos for each category
-  plt_category_videos_shares <- ggplot(df, aes(x = num_videos, y = shares, color = category)) + 
+  #Plot 9: Count of shares w.r.t videos for each category
+  plt_category_videos_shares <- ggplot(df, aes(x = num_videos, y = shares, color = category)) +
     geom_point(alpha=1/10, na.rm = TRUE) + 
     geom_smooth() +
     coord_cartesian(ylim = c(-80000,130000))
   print(plt_category_videos_shares)
 
-  #Plot 9: Global Sentiment Polarity w.r.t shares for each category 
-  plt_gsp_shares_category <- ggplot(classification_df, aes(x = global_sentiment_polarity, y = shares, color = is_popular)) + 
+  #Plot 10: Global Sentiment Polarity w.r.t shares for each category 
+  plt_gsp_shares_category <- ggplot(df, aes(x = global_sentiment_polarity, 
+                                            y = shares, color = is_popular)) + 
     geom_point(alpha=1/2, na.rm = TRUE) +
     facet_wrap(~category) +
     coord_cartesian(ylim = c(0,20000))
   print(plt_gsp_shares_category)
   
-  #Plot 10: Rate Positive Polarity w.r.t shares for each category 
-  plt_rpp_shares_category <- ggplot(classification_df, aes(x = rate_positive_words, y = shares, color = is_popular)) + 
+  #Plot 11: Rate Positive Polarity w.r.t shares for each category 
+  plt_rpp_shares_category <- ggplot(df, aes(x = rate_positive_words, 
+                                            y = shares, color = is_popular)) + 
     geom_point(alpha=1/2, na.rm = TRUE) +
     facet_wrap(~category) +
     coord_cartesian(ylim = c(0,20000))
   print(plt_rpp_shares_category)
   
-  #Plot 11: minimum negative polarity w.r.t shares for each category 
-  plt_mnp_shares_category <- ggplot(classification_df, aes(x = is_popular, y = min_negative_polarity)) +
+  #Plot 12: minimum negative polarity w.r.t shares for each category 
+  plt_mnp_shares_category <- ggplot(df, aes(x = is_popular, y = min_negative_polarity)) +
     geom_boxplot(na.rm = TRUE) +
     facet_wrap(~category)
   print(plt_mnp_shares_category)
   
-  #Plot 12: Global Rate Negative words w.r.t shares for each category 
-  plt_grnw_shares_category <- ggplot(classification_df, aes(x = is_popular, 
-                                                            y = global_rate_negative_words)) + 
+  #Plot 13: Global Rate Negative words w.r.t shares for each category 
+  plt_grnw_shares_category <- ggplot(df, aes(x = is_popular, y = global_rate_negative_words)) +
     geom_boxplot(na.rm = TRUE) +
     facet_wrap(~category)
   print(plt_grnw_shares_category)
   
-  #Plot 13: number of token content w.r.t shares 
-  plt_n_tokens_content_shares <- ggplot(classification_df, aes(x = n_tokens_content, y = shares)) + 
+  #Plot 14: number of token content w.r.t shares 
+  plt_n_tokens_content_shares <- ggplot(df, aes(x = n_tokens_content, y = shares)) + 
     geom_histogram(alpha=1/2, na.rm = TRUE, stat = "identity") +
     coord_cartesian(ylim = c(0,300000))
   print(plt_n_tokens_content_shares)
   
-  #Plot 14: global subjectivity w.r.t shares 
-  plt_global_sub_shares <- ggplot(classification_df, aes(x = global_subjectivity, 
+  #Plot 15: global subjectivity w.r.t shares 
+  plt_global_sub_shares <- ggplot(df, aes(x = global_subjectivity, 
                                                          y = shares, color = is_popular)) + 
     geom_point(na.rm = TRUE) +
     coord_cartesian(ylim = c(0,20000))
   print(plt_global_sub_shares)
   
-  #Plot 15: average token length w.r.t shares 
-  plt_avg_token_length_shares <- ggplot(classification_df, aes(x = average_token_length, y = shares)) + 
-    geom_point(na.rm = TRUE)+
+  #Plot 16: average token length w.r.t shares 
+  plt_avg_token_length_shares <- ggplot(df, aes(x = average_token_length, y = shares)) + 
+    geom_point(na.rm = TRUE, position = 'jitter')+
     coord_cartesian(ylim = c(0,20000))
   print(plt_avg_token_length_shares)
   
-  
-  #Plot 16: number of keywords w.r.t shares 
-  plt_num_key_shares_category <- ggplot(classification_df, aes(x = as.factor(num_keywords), 
-                                                y = shares)) + 
+  #Plot 17: number of keywords w.r.t shares 
+  plt_num_key_shares_category <- ggplot(df, aes(x = as.factor(num_keywords), y = shares)) + 
     geom_bar(stat = "identity") +
     facet_wrap(~category)
   print(plt_num_key_shares_category)
   
-  #Plot 17: number of hrefs w.r.t shares 
-  plt_num_href_shares <- ggplot(classification_df, aes(x = num_hrefs, y = shares)) + 
-    geom_histogram(na.rm = TRUE, stat = 'identity')+
+  #Plot 18: number of hrefs w.r.t shares 
+  plt_num_href_shares <- ggplot(df, aes(x = num_hrefs, y = shares)) + 
+    geom_histogram(na.rm = TRUE, stat = 'identity') +
     coord_cartesian(xlim = c(0,100))
-
   print(plt_num_href_shares)
   
-  #Plot 18: kw_avg_avg w.r.t shares 
-  plt <- ggplot(classification_df, aes(x = is_popular, y = kw_avg_avg)) + 
+  #Plot 19: kw_avg_avg w.r.t shares 
+  plt_kw_avg_avg <- ggplot(df, aes(x = is_popular, y = kw_avg_avg)) + 
     geom_boxplot(na.rm = TRUE) +
     facet_wrap(~category) + 
     coord_cartesian(ylim = c(0, 20000))
-  print(plt)
+  print(plt_kw_avg_avg)
   
-  ## Title subjectivity plot
-  plt_title_subj <- ggplot(classification_df, aes(x = is_popular, y = title_subjectivity))+
+  #Plot 20: Title subjectivity plot
+  plt_title_subj <- ggplot(df, aes(x = is_popular, y = title_subjectivity)) +
     geom_boxplot(na.rm = TRUE) +
     facet_wrap(~category)
   print(plt_title_subj)
+  
+  #Plot 21: number of token in title w.r.t shares 
+  plt_n_tokens_title <- ggplot(df, aes(x = is_popular, y = n_tokens_title)) + 
+    geom_boxplot(na.rm = TRUE) +
+    facet_wrap(~category)
+  print(plt_n_tokens_title)
   
 } 
 ```
@@ -213,8 +255,8 @@ visualize_summary_plots <- function(df) {
 visualize_summary_plots(classification_df)
 ```
 
-
-```{r f3, echo = FALSE}
+## Correlation Matrix - EDA
+```{r f4, echo = FALSE}
 correlation_matrix <- function(df) {
   corr_df <- as.data.frame(cor(df, method = c("pearson", "kendall", "spearman")))
   rownames(corr_df) <- colnames(corr_df)
@@ -236,8 +278,8 @@ corr_df %>% select(correlation_with, shares) %>% arrange(desc(abs(shares))) %>% 
 
 ```
 
-
-```{r f4, echo=FALSE}
+## PCA for dimensionality reduction - EDA
+```{r f5, echo=FALSE}
 #Principle Component Analysis for dimensionality reduction
 
 featureSelection <- function(df,maxComponents){
@@ -293,7 +335,8 @@ top_features$num_videos <- scale(top_features$num_videos)
 top_features$num_hrefs <- scale(top_features$num_hrefs)
 ```
 
-```{r f5, echo=FALSE}
+## Clustering - Modeling
+```{r f6, echo=FALSE}
 
 #Clustering Algorithms
 
@@ -332,7 +375,8 @@ apply_DBScan = function(df,e,p){
 
 ```
 
-```{r f6, echo=FALSE}
+## Plots for clustering - EDA
+```{r f7, echo=FALSE}
 
 clusterPlots = function(df,clusterValues){
   
@@ -378,7 +422,8 @@ clusterPlots = function(df,clusterValues){
 
 ```
 
-```{r f7, echo=FALSE}
+## Clustering Analysis - EDA
+```{r f8, echo=FALSE}
 #Clustering Analysis: Exploration Phase
 
 elbowPlot(cluster_numeric_df,15)
@@ -406,55 +451,14 @@ clusterPlots(explorationData, explorationData$cluster3)
 
 ```
 
-
-```{r f8, echo = FALSE}
-prepare_data_classification <- function(df) {
+## Classification - Modeling 
+```{r f9, echo = FALSE}
+article_popularity_classification <- function(df) {
   
-  lifestyle_cutoff <- median(filter(df, category == 'Lifestyle')$shares)
-  entertainment_cutoff <- median(filter(df, category == 'Entertainment')$shares)
-  business_cutoff <- median(filter(df, category == 'Business')$shares)
-  socmed_cutoff <- median(filter(df, category == 'Social Media')$shares)
-  tech_cutoff <- median(filter(df, category == 'Technology')$shares)
-  world_cutoff <- median(filter(df, category == 'World')$shares)
-  
-  df <- df %>%
-    mutate( popularity = case_when(
-      category == 'Lifestyle' & shares >= lifestyle_cutoff ~ 'lifestyle_popular',
-      category == 'Lifestyle' & shares < lifestyle_cutoff ~ 'lifestyle_unpopular',
-      category == 'Entertainment' & shares >= entertainment_cutoff ~ 'entertainment_popular',
-      category == 'Entertainment' & shares < entertainment_cutoff ~ 'entertainment_unpopular',
-      category == 'Business' & shares >= business_cutoff ~ 'business_popular',
-      category == 'Business' & shares < business_cutoff ~ 'business_unpopular',
-      category == 'Social Media' & shares >= socmed_cutoff ~ 'socialmedia_popular',
-      category == 'Social Media' & shares < socmed_cutoff ~ 'socialmedia_unpopular',
-      category == 'Technology' & shares >= tech_cutoff ~ 'technology_popular',
-      category == 'Technology' & shares < tech_cutoff ~ 'technology_unpopular',
-      category == 'World' & shares >= world_cutoff ~ 'world_popular',
-      category == 'World' & shares < world_cutoff ~ 'world_unpopular')
-    )
-  
-  df <- df %>%
-    separate(popularity, c('cat', 'is_popular'), sep = '_', remove = FALSE)
-  
-  df <- df %>%
-    select(-cat)
-  
-  return (df)
 }
 ```
 
 ```{r}
-
-classification_df <- prepare_data_classification(classification_df)
-  
-#test_df <- prepare_data_classification(classification_df)
-
-
-
-#test_df %>%
-#  count(cat)
-
-visualize_summary_plots(classification_df)
 
 ```
 

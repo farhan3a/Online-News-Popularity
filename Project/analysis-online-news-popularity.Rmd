@@ -11,6 +11,7 @@ library(tidyverse)
 library(ggplot2)
 library(ggcorrplot)
 library(dbscan)
+library(caret)
 ```
 
 ## Load and Tidy Dataset
@@ -243,9 +244,8 @@ visualize_summary_plots <- function(df) {
   print(plt_title_subj)
   
   #Plot 21: number of token in title w.r.t shares 
-  plt_n_tokens_title <- ggplot(df, aes(x = is_popular, y = n_tokens_title)) + 
-    geom_boxplot(na.rm = TRUE) +
-    facet_wrap(~category)
+  plt_n_tokens_title <- ggplot(df, aes(x = n_tokens_title, y = shares)) + 
+    geom_histogram(alpha=1/2, na.rm = TRUE, stat = "identity")
   print(plt_n_tokens_title)
   
 } 
@@ -453,12 +453,146 @@ clusterPlots(explorationData, explorationData$cluster3)
 
 ## Classification - Modeling 
 ```{r f9, echo = FALSE}
-article_popularity_classification <- function(df) {
+news_ptest <- function(df) {
+  ## Linear model considering all variables
+  fit_all_lm_shares <- lm(shares ~ global_sentiment_polarity +
+                                    min_negative_polarity +
+                                    avg_negative_polarity +
+                                    kw_avg_avg +
+                                    n_non_stop_words +
+                                    kw_avg_min +
+                                    category +
+                                    title_subjectivity +
+                                    kw_min_min +
+                                    self_reference_avg_sharess +
+                                    abs_title_sentiment_polarity +
+                                    min_positive_polarity +
+                                    LDA_04 +
+                                    LDA_02 +
+                                    global_rate_negative_words +
+                                    kw_min_max +
+                                    kw_min_avg +
+                                    max_negative_polarity +
+                                    day +
+                                    average_token_length +
+                                    min_positive_polarity +
+                                    num_videos +
+                                    n_tokens_title +
+                                    num_hrefs +
+                                    global_subjectivity +
+                                    LDA_03 +
+                                    n_tokens_content +
+                                    num_imgs +
+                                    num_keywords +
+                                    rate_positive_words,
+                       data = df)
+  print(summary(fit_all_lm_shares))
   
+  ## Linear model considering top features with shares
+  
+  ##GLM model is_popular against all variables
+  fit_logit_popularity <- glm(as.factor(is_popular) ~ global_sentiment_polarity +
+                                    min_negative_polarity +
+                                    avg_negative_polarity +
+                                    kw_avg_avg +
+                                    n_non_stop_words +
+                                    kw_avg_min +
+                                    category +
+                                    title_subjectivity +
+                                    kw_min_min +
+                                    self_reference_avg_sharess +
+                                    abs_title_sentiment_polarity +
+                                    min_positive_polarity +
+                                    LDA_04 +
+                                    LDA_02 +
+                                    global_rate_negative_words +
+                                    kw_min_max +
+                                    kw_min_avg +
+                                    max_negative_polarity +
+                                    day +
+                                    average_token_length +
+                                    min_positive_polarity +
+                                    num_videos +
+                                    n_tokens_title +
+                                    num_hrefs +
+                                    global_subjectivity +
+                                    LDA_03 +
+                                    n_tokens_content +
+                                    num_imgs +
+                                    num_keywords +
+                                    rate_positive_words,
+                                family = binomial(link = 'logit'),
+                                data = df)
+  print(summary(fit_logit_popularity))
+  
+  ##GLM model is_popular against top variables
+}
+```
+
+```{r f10, echo = FALSE}
+## Considering top features with shares
+popularity_shares_modeling <- function(df) {
+  set.seed(123)
+  train_ids <- createDataPartition(df$is_popular, p=0.7, list=FALSE)
+  df_train <- df[train_ids, ]
+  df_test <- df[-train_ids, ]
+  
+  ctrl <- trainControl(method="repeatedcv", number=5, repeats=5)
+  grd <- expand.grid(alpha=1, lambda=exp(-10:-1))
+  
+  fit <- train(as.factor(is_popular) ~ global_sentiment_polarity +
+                                kw_avg_avg +
+                                category +
+                                kw_min_min +
+                                self_reference_avg_sharess +
+                                LDA_04 +
+                                LDA_02 +
+                                kw_min_max +
+                                average_token_length +
+                                num_videos +
+                                n_tokens_title +
+                                num_hrefs +
+                                global_subjectivity +
+                                n_tokens_content +
+                                num_keywords, 
+                  data=df_train, 
+                  method='rf',
+                  tuneLength = 15,
+                  metric = 'Accuracy',
+                  trControl=ctrl)
+  
+  print(confusionMatrix(predict(fit, df_test), as.factor(df_test$is_popular)))
+  
+  ##GLM model is_popular against all variables
+  # fit_logit_popularity <- glm(as.factor(is_popular) ~ global_sentiment_polarity +
+  #                                   kw_avg_avg +
+  #                                   kw_avg_min +
+  #                                   category +
+  #                                   kw_min_min +
+  #                                   self_reference_avg_sharess +
+  #                                   min_positive_polarity +
+  #                                   LDA_04 +
+  #                                   LDA_02 +
+  #                                   kw_min_max +
+  #                                   day +
+  #                                   average_token_length +
+  #                                   min_positive_polarity +
+  #                                   n_tokens_title +
+  #                                   num_hrefs +
+  #                                   global_subjectivity +
+  #                                   LDA_03 +
+  #                                   n_tokens_content +
+  #                                   num_keywords +
+  #                                   rate_positive_words,
+  #                               family = binomial(link = 'logit'),
+  #                               data = df)
+  # print(summary(fit_logit_popularity))
+  
+  ##GLM model is_popular against top variables
 }
 ```
 
 ```{r}
-
+popularity_shares_modeling(classification_df)
 ```
 

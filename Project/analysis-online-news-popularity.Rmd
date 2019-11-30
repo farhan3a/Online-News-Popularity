@@ -11,6 +11,8 @@ library(tidyverse)
 library(ggplot2)
 library(ggcorrplot)
 library(dbscan)
+library(caret)
+library(xgboost)
 ```
 
 ## Load and Tidy Dataset
@@ -48,19 +50,20 @@ get_tidy_data <- function(df) {
                                 day == 'weekday_is_saturday' ~ 'Saturday',
                                 day == 'weekday_is_sunday' ~ 'Sunday'))
   
+  modeling_df <- classification_df 
+  modeling_df$shares <- scale(modeling_df$shares)
   cluster_numeric_df <- clustering_df %>% 
     semi_join(classification_df, by='url') %>%
     select(-url,-article_title,-date,-timedelta,-is_weekend)
   cluster_numeric_df
   
-  return(list(cluster_numeric_df, classification_df))
+  return(list(cluster_numeric_df, classification_df,modeling_df))
 }
 ```
 
 ## Prepare Data for Classification
 ```{r f2, echo = FALSE}
 prepare_data_classification <- function(df) {
-  
   lifestyle_cutoff <- median(filter(df, category == 'Lifestyle')$shares)
   entertainment_cutoff <- median(filter(df, category == 'Entertainment')$shares)
   business_cutoff <- median(filter(df, category == 'Business')$shares)
@@ -100,6 +103,8 @@ list_of_dfs <- get_tidy_data(df)
 cluster_numeric_df <- list_of_dfs[[1]]
 classification_df <- list_of_dfs[[2]]
 classification_df <- prepare_data_classification(classification_df)
+modeling_df <- list_of_dfs[[3]]
+modeling_df <- prepare_data_classification(modeling_df)
 ```
 
 ## Visualize plots - EDA
@@ -243,9 +248,8 @@ visualize_summary_plots <- function(df) {
   print(plt_title_subj)
   
   #Plot 21: number of token in title w.r.t shares 
-  plt_n_tokens_title <- ggplot(df, aes(x = is_popular, y = n_tokens_title)) + 
-    geom_boxplot(na.rm = TRUE) +
-    facet_wrap(~category)
+  plt_n_tokens_title <- ggplot(df, aes(x = n_tokens_title, y = shares)) + 
+    geom_histogram(alpha=1/2, na.rm = TRUE, stat = "identity")
   print(plt_n_tokens_title)
   
 } 
@@ -453,12 +457,167 @@ clusterPlots(explorationData, explorationData$cluster3)
 
 ## Classification - Modeling 
 ```{r f9, echo = FALSE}
-article_popularity_classification <- function(df) {
+news_ptest <- function(df) {
+  ## Linear model considering all variables from PCA and corrMatrix
+  fit_all_lm_shares <- lm(shares ~ global_sentiment_polarity +
+                                    min_negative_polarity +
+                                    avg_negative_polarity +
+                                    kw_avg_avg +
+                                    n_non_stop_words +
+                                    kw_avg_min +
+                                    category +
+                                    title_subjectivity +
+                                    kw_min_min +
+                                    self_reference_avg_sharess +
+                                    abs_title_sentiment_polarity +
+                                    min_positive_polarity +
+                                    LDA_04 +
+                                    LDA_02 +
+                                    global_rate_negative_words +
+                                    kw_min_max +
+                                    kw_min_avg +
+                                    max_negative_polarity +
+                                    day +
+                                    average_token_length +
+                                    min_positive_polarity +
+                                    num_videos +
+                                    n_tokens_title +
+                                    num_hrefs +
+                                    global_subjectivity +
+                                    LDA_03 +
+                                    n_tokens_content +
+                                    num_imgs +
+                                    num_keywords +
+                                    rate_positive_words,
+                       data = df)
+  print(summary(fit_all_lm_shares))
   
+  ## Linear model considering top features with shares
+  
+  ##GLM model is_popular against all variables from PCA and corrMatrix
+  fit_logit_popularity <- glm(as.factor(is_popular) ~ global_sentiment_polarity +
+                                    min_negative_polarity +
+                                    avg_negative_polarity +
+                                    kw_avg_avg +
+                                    n_non_stop_words +
+                                    kw_avg_min +
+                                    category +
+                                    title_subjectivity +
+                                    kw_min_min +
+                                    self_reference_avg_sharess +
+                                    abs_title_sentiment_polarity +
+                                    min_positive_polarity +
+                                    LDA_04 +
+                                    LDA_02 +
+                                    global_rate_negative_words +
+                                    kw_min_max +
+                                    kw_min_avg +
+                                    max_negative_polarity +
+                                    day +
+                                    average_token_length +
+                                    min_positive_polarity +
+                                    num_videos +
+                                    n_tokens_title +
+                                    num_hrefs +
+                                    global_subjectivity +
+                                    LDA_03 +
+                                    n_tokens_content +
+                                    num_imgs +
+                                    num_keywords +
+                                    rate_positive_words,
+                                family = binomial(link = 'logit'),
+                                data = df)
+  print(summary(fit_logit_popularity))
+  
+  ##GLM model is_popular against top variables
 }
 ```
 
 ```{r}
+news_ptest(modeling_df)
+```
+
+```{r f10, echo = FALSE}
+## Considering top features with shares
+popularity_shares_modeling <- function(df) {
+  ## normalize variables being used for training the model HERE
+  df <- df %>% select(lobal_sentiment_polarity, kw_avg_avg, kw_avg_min,
+                      category, kw_min_min, self_reference_avg_sharess, 
+                      min_positive_polarity, LDA_04, LDA_02, kw_min_max,
+                      day, average_token_length, min_positive_polarity,
+                      n_tokens_title, num_hrefs, global_subjectivity, 
+                      LDA_03, n_tokens_content, num_keywords, rate_positive_words)
+  set.seed(123)
+  train_ids <- createDataPartition(df$is_popular, p=0.8, list=FALSE)
+  df_train <- df[train_ids, ]
+  df_test <- df[-train_ids, ]
+  
+  ctrl <- trainControl(method="repeatedcv", number=5, repeats=5)
+  grd <- expand.grid(alpha=1, lambda=exp(-10:-1))
+  
+  ### GLM model
+  fit_glm <- train(as.factor(is_popular) ~ .,
+                  data = df_train,
+                  method = "glm",
+                  family = binomial(link = "logit"),
+                  trControl = ctrl)
+
+  saveRDS(fit_glm, "./fit_glm.rds")
+  # load the model
+  fit_glm <- readRDS("./fit_glm.rds")
+  print(fit_glm)
+  # make a predictions on "new data" using the final mode
+  print(confusionMatrix(predict(fit_glm, df_test), as.factor(df_test$is_popular)))
+  
+  ### Random forrest model
+  fit_rf <- train(as.factor(is_popular) ~ .,
+                  data = df_train,
+                  method = "rf",
+                  metric = "Accuracy",
+                  tuneLength = 10,
+                  trControl = ctrl)
+   
+  saveRDS(fit_rf, "./fit_rf.rds")
+  # load the model
+  fit_rf <- readRDS("./fit_rf.rds")
+  print(fit_rf)
+  # make a predictions on "new data" using the final mode
+  print(confusionMatrix(predict(fit_rf, df_test), as.factor(df_test$is_popular)))
+  
+  ### SVM Linear weights 2
+  fit_svm <- train(as.factor(is_popular) ~ .,
+                  data = df_train,
+                  method = "svmLinearWeights2",
+                  trControl = ctrl)
+   
+  saveRDS(fit_svm, "./fit_svm.rds")
+  # load the model
+  fit_svm <- readRDS("./fit_svm.rds")
+  print(fit_svm)
+  # make a predictions on "new data" using the final mode
+  print(confusionMatrix(predict(fit_svm, df_test), as.factor(df_test$is_popular)))
+
+  ## XGBoost model
+  fit_xgb <- train(as.factor(is_popular) ~ ., 
+                  data = df_train,
+                  method = "xgbTree",
+                  trControl = ctrl)
+  saveRDS(fit_xgb, "./fit_xgb.rds")
+  # load the model
+  fit_xgb <- readRDS("./fit_xgb.rds")
+  print(fit_xgb)
+  # make a predictions on "new data" using the final mode
+  print(confusionMatrix(predict(fit_xgb, df_test), as.factor(df_test$is_popular)))
+}
+```
+
+```{r}
+popularity_shares_modeling(modeling_df)
 
 ```
 
+```{r}
+ggplot(modeling_df) +
+  geom_histogram(aes(x = shares))
+  
+```

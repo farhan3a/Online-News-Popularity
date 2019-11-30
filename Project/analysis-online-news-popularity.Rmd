@@ -52,6 +52,14 @@ get_tidy_data <- function(df) {
   
   modeling_df <- classification_df 
   modeling_df$shares <- scale(modeling_df$shares)
+  modeling_df$kw_avg_avg <- scale(modeling_df$kw_avg_avg)
+  modeling_df$kw_avg_min <- scale(modeling_df$kw_avg_min)
+  modeling_df$kw_min_min <- scale(modeling_df$kw_min_min)
+  modeling_df$self_reference_avg_sharess <- scale(modeling_df$self_reference_avg_sharess)
+  modeling_df$kw_min_max <- scale(modeling_df$kw_min_max)
+  modeling_df$num_hrefs <- scale(modeling_df$num_hrefs)
+  modeling_df$n_tokens_content <- scale(modeling_df$n_tokens_content)
+  
   cluster_numeric_df <- clustering_df %>% 
     semi_join(classification_df, by='url') %>%
     select(-url,-article_title,-date,-timedelta,-is_weekend)
@@ -541,12 +549,17 @@ news_ptest(modeling_df)
 ## Considering top features with shares
 popularity_shares_modeling <- function(df) {
   ## normalize variables being used for training the model HERE
-  df <- df %>% select(lobal_sentiment_polarity, kw_avg_avg, kw_avg_min,
+  df <- df %>% select(global_sentiment_polarity, kw_avg_avg, kw_avg_min,
                       category, kw_min_min, self_reference_avg_sharess, 
                       min_positive_polarity, LDA_04, LDA_02, kw_min_max,
                       day, average_token_length, min_positive_polarity,
                       n_tokens_title, num_hrefs, global_subjectivity, 
-                      LDA_03, n_tokens_content, num_keywords, rate_positive_words)
+                      LDA_03, n_tokens_content, num_keywords, rate_positive_words) %>%
+              mutate(category = as.factor(category), 
+                     day = as.factor(day), 
+                     n_tokens_title = as.factor(n_tokens_title), 
+                     num_keywords = as.factor(num_keywords))
+  
   set.seed(123)
   train_ids <- createDataPartition(df$is_popular, p=0.8, list=FALSE)
   df_train <- df[train_ids, ]
@@ -619,5 +632,7 @@ popularity_shares_modeling(modeling_df)
 ```{r}
 ggplot(modeling_df) +
   geom_histogram(aes(x = shares))
+
+min(modeling_df$global_sentiment_polarity)
   
 ```
